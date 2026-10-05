@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport de Réparations NDF</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+               min-height: 100vh; padding: 20px; }
+        .container { max-width: 1600px; margin: 0 auto; background: white;
+                    border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                 color: white; padding: 40px; text-align: center; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; font-weight: 700; }
+        .header p { font-size: 1.1em; opacity: 0.95; margin-bottom: 15px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px; margin-top: 20px; }
+        .stat-box { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-number { font-size: 2em; font-weight: 700; display: block; }
+        .stat-label { font-size: 0.9em; opacity: 0.9; margin-top: 5px; }
+        .content { padding: 40px; }
+        .upload-section { background: #f0f4ff; padding: 25px; border-radius: 10px; 
+                         border: 2px dashed #667eea; margin-bottom: 30px; }
+        .upload-title { font-weight: 700; color: #333; margin-bottom: 15px; font-size: 1.1em; }
+        .file-input-wrapper { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .file-input-wrapper input[type="file"] { flex: 1; min-width: 200px; padding: 10px; border: 1px solid #ddd;
+                                                 border-radius: 6px; cursor: pointer; }
+        .file-input-wrapper button { padding: 10px 20px; background: #667eea; color: white;
+                                    border: none; border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+        .file-input-wrapper button:hover { background: #764ba2; }
+        .upload-info { font-size: 0.9em; color: #666; margin-top: 10px; }
+        .upload-messages { margin-top: 10px; }
+        .success-message { background: #d4edda; color: #155724; padding: 12px; border-radius: 6px;
+                          margin-top: 10px; display: none; }
+        .error-message { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 6px;
+                        margin-top: 10px; display: none; }
+        .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                  gap: 20px; margin-bottom: 40px; padding: 25px; background: #f8f9ff;
+                  border-radius: 10px; border: 1px solid #e0e7ff; }
+        .filter-group { display: flex; flex-direction: column; gap: 8px; }
+        .filter-group label { font-weight: 600; color: #333; }
+        .checkbox-group { display: flex; flex-direction: column; gap: 10px; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; }
+        .checkbox-item input[type="checkbox"] { cursor: pointer; width: 18px; height: 18px; accent-color: #667eea; }
+        .checkbox-item label { cursor: pointer; margin: 0; font-weight: 500; color: #333; }
+        .filter-group select { padding: 10px 12px; border: 2px solid #e0e7ff;
+                             border-radius: 6px; font-size: 0.95em; cursor: pointer; background: white; }
+        .button-group { display: flex; gap: 10px; align-items: flex-end; }
+        button { padding: 10px 20px; background: #667eea; color: white; border: none;
+                border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #764ba2; }
+        .section-title { font-size: 1.5em; color: #333; margin-top: 40px; margin-bottom: 20px;
+                        padding-bottom: 10px; border-bottom: 3px solid #667eea; font-weight: 700; }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+                      gap: 30px; margin: 30px 0; }
+        .chart-wrapper { padding: 20px; background: #f8f9ff; border-radius: 10px; }
+        .chart-title { text-align: center; color: #667eea; margin-bottom: 15px; font-weight: 600; }
+        .table-wrapper { overflow-x: auto; border-radius: 10px; border: 1px solid #e0e7ff; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        thead { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+               color: white; position: sticky; top: 0; z-index: 10; }
+        th, td { padding: 14px 18px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+        tbody tr:hover { background-color: #f8f9ff; }
+        tbody tr:nth-child(even) { background-color: #fafbff; }
+        .count-badge { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; }
+        .repair-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                       gap: 15px; margin-top: 20px; }
+        .repair-item { background: white; border-left: 4px solid #667eea; padding: 15px;
+                      border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        @media (max-width: 768px) { .filters { grid-template-columns: 1fr; }
+                                   .charts-grid { grid-template-columns: 1fr; }
+                                   .file-input-wrapper { flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Rapport de Réparations NDF</h1>
+            <p>Analyse détaillée des interventions</p>
+            <div class="stats">
+                <div class="stat-box"><span class="stat-number" id="statInterventions">0</span>
+                    <span class="stat-label">Interventions</span></div>
+                <div class="stat-box"><span class="stat-number" id="statClients">0</span>
+                    <span class="stat-label">Clients</span></div>
+                <div class="stat-box"><span class="stat-number" id="statModels">0</span>
+                    <span class="stat-label">Modèles</span></div>
+                <div class="stat-box"><span class="stat-number" id="statRepairs">0</span>
+                    <span class="stat-label">Types de réparation</span></div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <h2 style="color: #333; margin-bottom: 20px;">📁 Mise à Jour des Données</h2>
+            <div class="upload-section">
+                <div class="upload-title">Télécharger un fichier Excel pour mettre à jour le dashboard</div>
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" placeholder="Sélectionnez un fichier Excel...">
+                    <button onclick="uploadFile()">📤 Charger</button>
+                </div>
+                <div class="upload-info">
+                    ℹ️ Sélectionnez le fichier Excel avec les onglets "Void9" et "Name _NPC" pour mettre à jour les données
+                </div>
+                <div class="upload-messages">
+                    <div id="successMessage" class="success-message">✅ Données mises à jour avec succès!</div>
+                    <div id="errorMessage" class="error-message">❌ Erreur lors du chargement du fichier</div>
+                </div>
+            </div>
+
+            <h2 style="color: #333; margin-bottom: 20px;">🔍 Filtres</h2>
+            <div class="filters">
+                <div class="filter-group">
+                    <label style="font-weight: 700; margin-bottom: 12px;">👥 Clients</label>
+                    <div class="checkbox-group" id="clientCheckboxes"></div>
+                </div>
+                <div class="filter-group">
+                    <label for="modelFilter">Modèle</label>
+                    <select id="modelFilter"><option value="">Tous les modèles</option></select>
+                </div>
+                <div class="filter-group">
+                    <label for="monthFilter">Mois</label>
+                    <select id="monthFilter"><option value="">Tous les mois</option></select>
+                </div>
+                <div class="button-group">
+                    <button onclick="applyFilters()">🔎 Filtrer</button>
+                    <button onclick="resetFilters()" style="background: #6c757d;">↺ Réinitialiser</button>
+                </div>
+            </div>
+            
+            <h2 class="section-title">📊 Graphiques</h2>
+            <div class="charts-grid">
+                <div class="chart-wrapper">
+                    <h3 class="chart-title">Distribution par Client</h3>
+                    <canvas id="chartClient"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h3 class="chart-title">Top 15 Client-Modèle</h3>
+                    <canvas id="chartClientModel"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h3 class="chart-title">Types de Réparation</h3>
+                    <canvas id="chartRepairs"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h3 class="chart-title">Interventions par Mois</h3>
+                    <canvas id="chartMonthly"></canvas>
+                </div>
+            </div>
+            
+            <h2 class="section-title">📈 Interventions par Client, Modèle et Mois</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Modèle SKU</th>
+                            <th>Nom Marketing</th>
+                            <th>Mois</th>
+                            <th style="text-align: center;">Interventions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            
+            <h2 class="section-title">🔧 Types de Réparation</h2>
+            <div class="repair-grid" id="repairsContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        const globalData = {"interventions": [{"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750QGK-KS1FR", "Marketing_Name": "Galaxy Book4 360 15.6”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750QHA-KA1FR", "Marketing_Name": "Galaxy Book5 360 15.6”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750QHA-KA1FR", "Marketing_Name": "Galaxy Book5 360 15.6”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750QHA-KA1FR", "Marketing_Name": "Galaxy Book5 360 15.6”", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750QHA-KA3FR", "Marketing_Name": "Galaxy Book5 360 15.6”", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750QHA-KA4FR", "Marketing_Name": "NP750QHA-KA4FR", "Year_Month": "2026-09", "Count": 3}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG2FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-07", "Count": 2}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG2FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG3FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-05", "Count": 5}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG3FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-06", "Count": 3}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG3FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG3FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-08", "Count": 2}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG3FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-09", "Count": 3}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG6FR", "Marketing_Name": "NP750XGJ-KG6FR", "Year_Month": "2026-04", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG6FR", "Marketing_Name": "NP750XGJ-KG6FR", "Year_Month": "2026-06", "Count": 2}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG6FR", "Marketing_Name": "NP750XGJ-KG6FR", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG6FR", "Marketing_Name": "NP750XGJ-KG6FR", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XGJ-KG6FR", "Marketing_Name": "NP750XGJ-KG6FR", "Year_Month": "2026-09", "Count": 3}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XQA-KB1FR", "Marketing_Name": "Galaxy Book4 EDGE", "Year_Month": "2026-06", "Count": 2}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XQA-KB1FR", "Marketing_Name": "Galaxy Book4 EDGE", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XQB-KA1FR", "Marketing_Name": "Galaxy Book5 Edge", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP750XQB-KA4FR", "Marketing_Name": "NP750XQB-KA4FR", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP940XGK-KG1FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP940XGK-KG1FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP940XGK-KG1FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP940XHA-KG1FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP940XHA-KG1FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP960XFG-KC2FR", "Marketing_Name": "NP960XFG-KC2FR", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP960XGK-KG1FR", "Marketing_Name": "Galaxy Book4 Pro 16”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "NP960XMA-KB1FR", "Marketing_Name": "Galaxy Book4 EDGE", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "BOULANGER", "MODEL": "XE340XDA-KA3FR", "Marketing_Name": "XE340XDA-KA3FR", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP730QFG-KA2FR", "Marketing_Name": "NP730QFG-KA2FR", "Year_Month": "2026-04", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP730QFG-KA2FR", "Marketing_Name": "NP730QFG-KA2FR", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP730QFG-KA2FR", "Marketing_Name": "NP730QFG-KA2FR", "Year_Month": "2026-06", "Count": 3}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP730QFG-KA2FR", "Marketing_Name": "NP730QFG-KA2FR", "Year_Month": "2026-07", "Count": 3}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP730QFG-KA2FR", "Marketing_Name": "NP730QFG-KA2FR", "Year_Month": "2026-09", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP750XGK-KG2FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP750XQB-KA2FR", "Marketing_Name": "Galaxy Book5 Edge", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP750XQB-KA2FR", "Marketing_Name": "Galaxy Book5 Edge", "Year_Month": "2026-07", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP750XQB-KA2FR", "Marketing_Name": "Galaxy Book5 Edge", "Year_Month": "2026-08", "Count": 4}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP750XQB-KA2FR", "Marketing_Name": "Galaxy Book5 Edge", "Year_Month": "2026-09", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG1BR", "Marketing_Name": "NP940XGK-KG1BR", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG1FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG1FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-04", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-06", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-07", "Count": 5}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-08", "Count": 3}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-09", "Count": 5}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XHA-KG1FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XHA-KG3FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XHA-KG3FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-07", "Count": 4}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP940XHA-KG3FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-08", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP950XGK-KA2FR", "Marketing_Name": "NP950XGK-KA2FR", "Year_Month": "2026-04", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP950XGK-KA2FR", "Marketing_Name": "NP950XGK-KA2FR", "Year_Month": "2026-06", "Count": 3}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP950XGK-KA2FR", "Marketing_Name": "NP950XGK-KA2FR", "Year_Month": "2026-07", "Count": 2}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP950XGK-KA2FR", "Marketing_Name": "NP950XGK-KA2FR", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "FNAC", "MODEL": "NP950XGK-KA2FR", "Marketing_Name": "NP950XGK-KA2FR", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP750QGK-KG1FR", "Marketing_Name": "Galaxy Book4 360 15.6”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP750QGK-KS1FR", "Marketing_Name": "Galaxy Book4 360 15.6”", "Year_Month": "2026-05", "Count": 2}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP750QGK-KS1FR", "Marketing_Name": "Galaxy Book4 360 15.6”", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP750QHA-KA1FR", "Marketing_Name": "Galaxy Book5 360 15.6”", "Year_Month": "2026-05", "Count": 2}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP750XGJ-KG2FR", "Marketing_Name": "Galaxy Book4", "Year_Month": "2026-10", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP754XGK-KS2FR", "Marketing_Name": "NP754XGK-KS2FR", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960QGK-KG2FR", "Marketing_Name": "Galaxy Book4 Pro 360 16”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960QHA-KG1FR", "Marketing_Name": "Galaxy Book5 Pro 360 16”", "Year_Month": "2026-04", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960UJG-KG2FR", "Marketing_Name": "GB6 Ultra (INT)", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960UJH-XG3FR", "Marketing_Name": "GB6 Ultra (EXT)", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960XGK-KG1FR", "Marketing_Name": "Galaxy Book4 Pro 16”", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960XGL-XG1FR", "Marketing_Name": "Galaxy Book4 Ultra 16”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960XGL-XG1FR", "Marketing_Name": "Galaxy Book4 Ultra 16”", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960XGL-XG1FR", "Marketing_Name": "Galaxy Book4 Ultra 16”", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960XGL-XG2FR", "Marketing_Name": "Galaxy Book4 Ultra 16”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "NP960XGL-XG2FR", "Marketing_Name": "Galaxy Book4 Ultra 16”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PARTICULIER", "MODEL": "XE340XDA-KA3FR", "Marketing_Name": "XE340XDA-KA3FR", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP730QFG-KA2FR", "Marketing_Name": "NP730QFG-KA2FR", "Year_Month": "2026-07", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP730QFG-KA2FR", "Marketing_Name": "NP730QFG-KA2FR", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP750XQA-KB1FR", "Marketing_Name": "Galaxy Book4 EDGE", "Year_Month": "2026-04", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP750XQB-KA2FR", "Marketing_Name": "Galaxy Book5 Edge", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XGK-KG1BR", "Marketing_Name": "NP940XGK-KG1BR", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-04", "Count": 3}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-07", "Count": 2}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-08", "Count": 2}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XGK-KG3FR", "Marketing_Name": "Galaxy Book4 Pro 14”", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XHA-KG1FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-06", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XHA-KG3FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-08", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP940XHA-KG3FR", "Marketing_Name": "Galaxy Book5 Pro 14”", "Year_Month": "2026-09", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "NP960XMA-KB1FR", "Marketing_Name": "Galaxy Book4 EDGE", "Year_Month": "2026-05", "Count": 1}, {"CUSTOMERTYPE": "PF DARTY", "MODEL": "XE340XDA-KA3FR", "Marketing_Name": "XE340XDA-KA3FR", "Year_Month": "2026-06", "Count": 1}], "repair_types": ["Mise à niveau logiciel", "Test complet|Mise à niveau logiciel", "Test complet", "Mise à niveau logiciel|Reprogrammation", "Retour en l'état", "Repositionnement / Remontage|Mise à niveau logiciel", "Nettoyage|Nettoyage|Nettoyage|Test complet|Mise à niveau logiciel"], "repair_counts": [{"repair_type": "Mise à niveau logiciel", "count": 127}, {"repair_type": "Test complet|Mise à niveau logiciel", "count": 4}, {"repair_type": "Test complet", "count": 4}, {"repair_type": "Mise à niveau logiciel|Reprogrammation", "count": 4}, {"repair_type": "Retour en l'état", "count": 3}, {"repair_type": "Repositionnement / Remontage|Mise à niveau logiciel", "count": 2}, {"repair_type": "Nettoyage|Nettoyage|Nettoyage|Test complet|Mise à niveau logiciel", "count": 1}], "client_model_counts": [{"name": "FNAC - Galaxy Book4 Pro 14”", "count": 20}, {"name": "BOULANGER - Galaxy Book4", "count": 17}, {"name": "FNAC - NP730QFG-KA2FR", "count": 11}, {"name": "PF DARTY - Galaxy Book4 Pro 14”", "count": 10}, {"name": "FNAC - NP950XGK-KA2FR", "count": 9}, {"name": "FNAC - Galaxy Book5 Edge", "count": 9}, {"name": "BOULANGER - NP750XGJ-KG6FR", "count": 8}, {"name": "FNAC - Galaxy Book5 Pro 14”", "count": 8}, {"name": "PARTICULIER - Galaxy Book4 Ultra 16”", "count": 5}, {"name": "BOULANGER - Galaxy Book5 360 15.6”", "count": 4}, {"name": "BOULANGER - Galaxy Book4 EDGE", "count": 4}, {"name": "PARTICULIER - Galaxy Book4 360 15.6”", "count": 4}, {"name": "PF DARTY - Galaxy Book5 Pro 14”", "count": 3}, {"name": "BOULANGER - NP750QHA-KA4FR", "count": 3}, {"name": "BOULANGER - Galaxy Book4 Pro 14”", "count": 3}, {"name": "BOULANGER - Galaxy Book5 Pro 14”", "count": 2}, {"name": "PF DARTY - NP730QFG-KA2FR", "count": 2}, {"name": "PF DARTY - Galaxy Book4 EDGE", "count": 2}, {"name": "PARTICULIER - Galaxy Book5 360 15.6”", "count": 2}, {"name": "PARTICULIER - Galaxy Book4", "count": 1}, {"name": "FNAC - NP940XGK-KG1BR", "count": 1}, {"name": "BOULANGER - NP750XQB-KA4FR", "count": 1}, {"name": "PARTICULIER - Galaxy Book4 Pro 16”", "count": 1}, {"name": "PF DARTY - NP940XGK-KG1BR", "count": 1}, {"name": "BOULANGER - XE340XDA-KA3FR", "count": 1}, {"name": "BOULANGER - Galaxy Book5 Edge", "count": 1}, {"name": "FNAC - Galaxy Book4", "count": 1}, {"name": "PARTICULIER - GB6 Ultra (INT)", "count": 1}, {"name": "BOULANGER - NP960XFG-KC2FR", "count": 1}, {"name": "PARTICULIER - GB6 Ultra (EXT)", "count": 1}, {"name": "PF DARTY - Galaxy Book5 Edge", "count": 1}, {"name": "PARTICULIER - NP754XGK-KS2FR", "count": 1}, {"name": "PF DARTY - XE340XDA-KA3FR", "count": 1}, {"name": "PARTICULIER - XE340XDA-KA3FR", "count": 1}, {"name": "PARTICULIER - Galaxy Book4 Pro 360 16”", "count": 1}, {"name": "BOULANGER - Galaxy Book4 360 15.6”", "count": 1}, {"name": "BOULANGER - Galaxy Book4 Pro 16”", "count": 1}, {"name": "PARTICULIER - Galaxy Book5 Pro 360 16”", "count": 1}], "monthly_data": [{"month": "2026-04", "count": 12}, {"month": "2026-05", "count": 21}, {"month": "2026-06", "count": 28}, {"month": "2026-07", "count": 31}, {"month": "2026-08", "count": 21}, {"month": "2026-09", "count": 31}, {"month": "2026-10", "count": 1}], "clients": ["BOULANGER", "FNAC", "PARTICULIER", "PF DARTY"], "models": ["NP730QFG-KA2FR", "NP750QGK-KG1FR", "NP750QGK-KS1FR", "NP750QHA-KA1FR", "NP750QHA-KA3FR", "NP750QHA-KA4FR", "NP750XGJ-KG2FR", "NP750XGJ-KG3FR", "NP750XGJ-KG6FR", "NP750XGK-KG2FR", "NP750XQA-KB1FR", "NP750XQB-KA1FR", "NP750XQB-KA2FR", "NP750XQB-KA4FR", "NP754XGK-KS2FR", "NP940XGK-KG1BR", "NP940XGK-KG1FR", "NP940XGK-KG3FR", "NP940XHA-KG1FR", "NP940XHA-KG3FR", "NP950XGK-KA2FR", "NP960QGK-KG2FR", "NP960QHA-KG1FR", "NP960UJG-KG2FR", "NP960UJH-XG3FR", "NP960XFG-KC2FR", "NP960XGK-KG1FR", "NP960XGL-XG1FR", "NP960XGL-XG2FR", "NP960XMA-KB1FR", "XE340XDA-KA3FR"], "months": ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]};
+        let originalData = [];
+        let charts = {};
+
+        function initDashboard() {
+            try {
+                originalData = JSON.parse(JSON.stringify(globalData.interventions));
+                
+                updateStats();
+                populateFilters();
+                renderTable(originalData);
+                renderRepairs(globalData.repair_types);
+                renderCharts(originalData);
+                console.log('✓ Dashboard chargé avec succès');
+            } catch (err) {
+                console.error('Erreur:', err);
+            }
+        }
+
+        function updateStats() {
+            const totalInterventions = globalData.interventions.reduce((sum, item) => sum + item.Count, 0);
+            document.getElementById('statInterventions').textContent = totalInterventions;
+            document.getElementById('statClients').textContent = globalData.clients.length;
+            document.getElementById('statModels').textContent = globalData.models.length;
+            document.getElementById('statRepairs').textContent = globalData.repair_types.length;
+        }
+
+        function populateFilters() {
+            const clientContainer = document.getElementById('clientCheckboxes');
+            clientContainer.innerHTML = '';
+            globalData.clients.forEach(client => {
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                div.innerHTML = `<input type="checkbox" id="client_${client}" value="${client}" checked>
+                    <label for="client_${client}">${client}</label>`;
+                clientContainer.appendChild(div);
+            });
+
+            const modelSelect = document.getElementById('modelFilter');
+            modelSelect.innerHTML = '<option value="">Tous les modèles</option>';
+            globalData.models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+
+            const monthSelect = document.getElementById('monthFilter');
+            monthSelect.innerHTML = '<option value="">Tous les mois</option>';
+            globalData.months.forEach(month => {
+                const option = document.createElement('option');
+                option.value = month;
+                option.textContent = formatMonth(month);
+                monthSelect.appendChild(option);
+            });
+        }
+
+        function formatMonth(m) {
+            const mths = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aou', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const parts = m.split('-');
+            return mths[parseInt(parts[1]) - 1] + ' ' + parts[0];
+        }
+
+        function applyFilters() {
+            const selectedClients = [];
+            globalData.clients.forEach(c => {
+                if (document.getElementById(`client_${c}`).checked) {
+                    selectedClients.push(c);
+                }
+            });
+
+            const selectedModel = document.getElementById('modelFilter').value;
+            const selectedMonth = document.getElementById('monthFilter').value;
+
+            const filtered = originalData.filter(item =>
+                (selectedClients.length === 0 || selectedClients.includes(item.CUSTOMERTYPE)) &&
+                (!selectedModel || item.MODEL === selectedModel) &&
+                (!selectedMonth || item.Year_Month === selectedMonth)
+            );
+
+            renderTable(filtered);
+            renderCharts(filtered);
+        }
+
+        function resetFilters() {
+            globalData.clients.forEach(c => {
+                document.getElementById(`client_${c}`).checked = true;
+            });
+            document.getElementById('modelFilter').value = '';
+            document.getElementById('monthFilter').value = '';
+            renderTable(originalData);
+            renderCharts(originalData);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Aucune donnée</td></tr>';
+                return;
+            }
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td><strong>${item.CUSTOMERTYPE}</strong></td>
+                    <td><code style="background:#f5f5f5;padding:4px;border-radius:4px;">${item.MODEL}</code></td>
+                    <td>${item.Marketing_Name}</td>
+                    <td>${formatMonth(item.Year_Month)}</td>
+                    <td style="text-align:center;"><span class="count-badge">${item.Count}</span></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderRepairs(repairs) {
+            const container = document.getElementById('repairsContainer');
+            container.innerHTML = '';
+            repairs.forEach((repair, idx) => {
+                const div = document.createElement('div');
+                div.className = 'repair-item';
+                div.innerHTML = `<div style="font-weight:600;color:#667eea;margin-bottom:8px;">Type ${idx + 1}</div>
+                    <div style="color:#666;font-size:0.95em;">${repair}</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        function renderCharts(filtered) {
+            renderClientChart(filtered);
+            renderClientModelChart();
+            renderRepairsChart();
+            renderMonthlyChart(filtered);
+        }
+
+        function renderClientChart(filtered) {
+            const cc = {};
+            filtered.forEach(item => {
+                cc[item.CUSTOMERTYPE] = (cc[item.CUSTOMERTYPE] || 0) + item.Count;
+            });
+
+            const labels = Object.keys(cc).sort();
+            const data = labels.map(l => cc[l]);
+
+            const ctx = document.getElementById('chartClient').getContext('2d');
+            if (charts.client) charts.client.destroy();
+
+            charts.client = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a'],
+                        borderColor: '#fff',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } }
+                    }
+                }
+            });
+        }
+
+        function renderClientModelChart() {
+            const top15 = globalData.client_model_counts.slice(0, 15);
+            const labels = top15.map(c => c.name.length > 30 ? c.name.substring(0, 27) + '...' : c.name);
+            const data = top15.map(c => c.count);
+
+            const ctx = document.getElementById('chartClientModel').getContext('2d');
+            if (charts.clientModel) charts.clientModel.destroy();
+
+            charts.clientModel = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
+                                        '#6574e8', '#75389c', '#f0a0eb', '#40e6fe', '#37d36a', '#f56894',
+                                        '#8895f7', '#8f4da8', '#f7b9f3'],
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 9 }, padding: 8 } }
+                    }
+                }
+            });
+        }
+
+        function renderRepairsChart() {
+            const labels = globalData.repair_counts.map(d => d.repair_type.length > 25 ? d.repair_type.substring(0, 22) + '...' : d.repair_type);
+            const data = globalData.repair_counts.map(d => d.count);
+
+            const ctx = document.getElementById('chartRepairs').getContext('2d');
+            if (charts.repairs) charts.repairs.destroy();
+
+            charts.repairs = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#6574e8', '#75389c'],
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8 } }
+                    }
+                }
+            });
+        }
+
+        function renderMonthlyChart(filtered) {
+            const mc = {};
+            filtered.forEach(item => {
+                mc[item.Year_Month] = (mc[item.Year_Month] || 0) + item.Count;
+            });
+
+            const labels = globalData.months.map(m => formatMonth(m));
+            const data = globalData.months.map(m => mc[m] || 0);
+
+            const ctx = document.getElementById('chartMonthly').getContext('2d');
+            if (charts.monthly) charts.monthly.destroy();
+
+            charts.monthly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Interventions',
+                        data: data,
+                        backgroundColor: '#667eea',
+                        borderColor: '#764ba2',
+                        borderWidth: 2,
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true, max: 35 }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+        }
+
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const successMsg = document.getElementById('successMessage');
+            const errorMsg = document.getElementById('errorMessage');
+
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            if (!file) {
+                errorMsg.textContent = '❌ Veuillez sélectionner un fichier';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'array' });
+                    
+                    if (!workbook.SheetNames.includes('Void9')) {
+                        throw new Error('L\'onglet "Void9" est manquant');
+                    }
+                    if (!workbook.SheetNames.includes('Name _NPC')) {
+                        throw new Error('L\'onglet "Name _NPC" est manquant');
+                    }
+                    
+                    const void9Data = XLSX.utils.sheet_to_json(workbook.Sheets['Void9']);
+                    const nameData = XLSX.utils.sheet_to_json(workbook.Sheets['Name _NPC']);
+                    
+                    if (void9Data.length === 0) {
+                        throw new Error('Aucune donnée trouvée dans Void9');
+                    }
+                    
+                    // Créer le mapping des noms
+                    const nameMapping = {};
+                    let lastName = '';
+                    nameData.forEach(row => {
+                        if (row['Marketing Name'] && row['Marketing Name'].trim()) {
+                            lastName = row['Marketing Name'];
+                        }
+                        if (row['SKU']) {
+                            nameMapping[row['SKU']] = lastName;
+                        }
+                    });
+                    
+                    // Traiter les données
+                    const groupedData = {};
+                    const repairCounts = {};
+                    const clientModelCounts = {};
+                    const clientsSet = new Set();
+                    const modelsSet = new Set();
+                    const monthsSet = new Set();
+                    const repairTypesSet = new Set();
+                    
+                    void9Data.forEach(row => {
+                        const model = row['MODEL'] || '';
+                        const marketingName = nameMapping[model] || model;
+                        const customer = row['CUSTOMERTYPE'] || '';
+                        const repairType = row['REPAIRTYPE'] || '';
+                        
+                        let yearMonth = '';
+                        if (row['DELIVERYDATE']) {
+                            const dateObj = new Date(row['DELIVERYDATE']);
+                            if (!isNaN(dateObj)) {
+                                yearMonth = dateObj.getFullYear() + '-' + 
+                                           String(dateObj.getMonth() + 1).padStart(2, '0');
+                            }
+                        }
+                        
+                        clientsSet.add(customer);
+                        modelsSet.add(model);
+                        monthsSet.add(yearMonth);
+                        repairTypesSet.add(repairType);
+                        
+                        const key = customer + '|' + model + '|' + marketingName + '|' + yearMonth;
+                        groupedData[key] = (groupedData[key] || 0) + 1;
+                        
+                        repairCounts[repairType] = (repairCounts[repairType] || 0) + 1;
+                        
+                        const cmKey = customer + ' - ' + marketingName;
+                        clientModelCounts[cmKey] = (clientModelCounts[cmKey] || 0) + 1;
+                    });
+                    
+                    // Mettre à jour globalData
+                    globalData.interventions = Object.keys(groupedData).map(key => {
+                        const [ct, model, mname, ym] = key.split('|');
+                        return {
+                            CUSTOMERTYPE: ct,
+                            MODEL: model,
+                            Marketing_Name: mname,
+                            Year_Month: ym,
+                            Count: groupedData[key]
+                        };
+                    });
+                    
+                    globalData.clients = Array.from(clientsSet).sort();
+                    globalData.models = Array.from(modelsSet).sort();
+                    globalData.months = Array.from(monthsSet).sort();
+                    globalData.repair_types = Array.from(repairTypesSet).sort();
+                    globalData.repair_counts = Array.from(repairTypesSet).map(rt => ({
+                        repair_type: rt,
+                        count: repairCounts[rt]
+                    }));
+                    globalData.client_model_counts = Object.keys(clientModelCounts)
+                        .map(name => ({ name: name, count: clientModelCounts[name] }))
+                        .sort((a, b) => b.count - a.count);
+                    
+                    originalData = JSON.parse(JSON.stringify(globalData.interventions));
+                    
+                    updateStats();
+                    populateFilters();
+                    renderTable(originalData);
+                    renderRepairs(globalData.repair_types);
+                    renderCharts(originalData);
+                    
+                    successMsg.textContent = '✅ Données mises à jour avec succès! (' + void9Data.length + ' interventions)';
+                    successMsg.style.display = 'block';
+                    fileInput.value = '';
+                    
+                } catch (err) {
+                    errorMsg.textContent = '❌ Erreur: ' + err.message;
+                    errorMsg.style.display = 'block';
+                    console.error('Erreur détaillée:', err);
+                }
+            };
+            
+            reader.onerror = function() {
+                errorMsg.textContent = '❌ Erreur lors de la lecture du fichier';
+                errorMsg.style.display = 'block';
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>
